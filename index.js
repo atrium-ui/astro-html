@@ -56,7 +56,7 @@ export default function email(options) {
 
             // Generate manifest.json with all pages
             const manifest = pages
-              .filter((p) => p.pathname || "index" !== "index")
+              .filter((p) => p.pathname)
               .map((p) => ({
                 name: p.pathname || "index",
                 path: p.pathname ? `${p.pathname}.html` : "index.html",
@@ -78,6 +78,18 @@ export default function email(options) {
               path.resolve(dir.pathname, `${pathname}.html`),
               path.resolve(dir.pathname, name),
             );
+
+            // check if an .jpg file with the same name exists and copy it to dist too.
+            const jpgPath = path.resolve(dir.pathname, `${pathname}.jpg`);
+            if (fs.existsSync(jpgPath)) {
+              const newJpgName =
+                typeof options.filename === "string"
+                  ? options.filename
+                      .replace("[name]", basename)
+                      .replace(/\.[^.]+$/, ".jpg")
+                  : options.filename(basename).replace(/\.[^.]+$/, ".jpg");
+              fs.copyFileSync(jpgPath, path.resolve(dir.pathname, newJpgName));
+            }
           }
         }
       },
