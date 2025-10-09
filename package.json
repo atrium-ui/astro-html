@@ -10,7 +10,7 @@
 		"type": "git",
 		"url": "https://github.com/luckydye/astro-email.git"
 	},
-	"version": "0.18.0",
+	"version": "0.18.1",
 	"main": "index.js",
 	"scripts": {
 		"dev": "astro dev",
