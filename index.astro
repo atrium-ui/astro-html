@@ -32,6 +32,10 @@ async function findTemplates(
 				);
 				results.push(...subResults);
 			} else {
+				if (!itemPath.endsWith(".astro")) {
+					continue;
+				}
+
 				const astroPageRaw = { default: fs.readFileSync(itemPath, "utf-8") };
 				const frontMatterMatch = astroPageRaw.default?.match(
 					/^---\s*([\s\S]*?)\s*---/,
