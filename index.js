@@ -53,10 +53,10 @@ export default function email(options) {
           const manifest = [];
 
           for (const page of pages) {
-            const pathname = page.pathname || "index";
+            const pathname = page.pathname;
             const basename = pathname.split(".")[0];
 
-            if (!pathname) continue;
+            if (!pathname) continue; // index has none
 
             const name =
               typeof options.filename === "string"
