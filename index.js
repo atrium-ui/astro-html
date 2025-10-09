@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import * as vite from "vite";
 import child_process from "node:child_process";
-import archiver from "archiver";
 
 /**
  * @param {object} options
@@ -55,6 +54,19 @@ export default function email(options) {
             const pathname = page.pathname || "index";
             const basename = pathname.split(".")[0];
 
+            // Generate manifest.json with all pages
+            const manifest = pages
+              .filter((p) => p.pathname || "index" !== "index")
+              .map((p) => ({
+                name: p.pathname || "index",
+                path: p.pathname ? `${p.pathname}.html` : "index.html",
+              }));
+
+            fs.writeFileSync(
+              path.resolve(dir.pathname, "manifest.json"),
+              JSON.stringify(manifest, null, 2),
+            );
+
             if (!pathname) continue;
 
             const name =
@@ -68,8 +80,6 @@ export default function email(options) {
             );
           }
         }
-
-        await archiveAssets();
       },
       "astro:server:setup": ({ server }) => {
         server.ws.on("astro-dev-toolbar:astro-email:toggled", (data) => {
@@ -103,46 +113,4 @@ function optionsPlugin(experimentalReactChildren) {
       }
     },
   };
-}
-
-async function archiveAssets() {
-  // Generate assets zip at build time
-  const distPath = path.resolve("dist");
-
-  async function createAssetsZip() {
-    if (!fs.existsSync(distPath)) {
-      console.log("No dist directory found, skipping assets zip creation");
-      return null;
-    }
-
-    const tmpZipPath = path.resolve("assets.zip");
-
-    return new Promise((resolve, reject) => {
-      const output = fs.createWriteStream(tmpZipPath);
-      const archive = archiver("zip", {
-        zlib: { level: 9 },
-      });
-
-      output.on("close", () => {
-        console.log(`Assets zip created: ${archive.pointer()} total bytes`);
-
-        // Move assets.zip to dist/
-        const finalZipPath = path.resolve(distPath, "assets.zip");
-        fs.renameSync(tmpZipPath, finalZipPath);
-        console.log(`Assets zip moved to: ${finalZipPath}`);
-
-        resolve(tmpZipPath);
-      });
-
-      archive.on("error", (err) => {
-        reject(err);
-      });
-
-      archive.pipe(output);
-      archive.directory(distPath, false);
-      archive.finalize();
-    });
-  }
-
-  return await createAssetsZip();
 }
