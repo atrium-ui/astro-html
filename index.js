@@ -50,22 +50,11 @@ export default function email(options) {
       },
       "astro:build:done": async ({ dir, pages }) => {
         if (options.filename) {
+          const manifest = [];
+
           for (const page of pages) {
             const pathname = page.pathname || "index";
             const basename = pathname.split(".")[0];
-
-            // Generate manifest.json with all pages
-            const manifest = pages
-              .filter((p) => p.pathname)
-              .map((p) => ({
-                name: p.pathname || "index",
-                path: p.pathname ? `${p.pathname}.html` : "index.html",
-              }));
-
-            fs.writeFileSync(
-              path.resolve(dir.pathname, "manifest.json"),
-              JSON.stringify(manifest, null, 2),
-            );
 
             if (!pathname) continue;
 
@@ -79,8 +68,10 @@ export default function email(options) {
               path.resolve(dir.pathname, name),
             );
 
+            const files = [name];
+
             // check if an .jpg file with the same name exists and copy it to dist too.
-            const jpgPath = path.resolve(dir.pathname, `${pathname}.jpg`);
+            const jpgPath = path.resolve("src/pages", `${pathname}.jpg`);
             if (fs.existsSync(jpgPath)) {
               const newJpgName =
                 typeof options.filename === "string"
@@ -89,8 +80,19 @@ export default function email(options) {
                       .replace(/\.[^.]+$/, ".jpg")
                   : options.filename(basename).replace(/\.[^.]+$/, ".jpg");
               fs.copyFileSync(jpgPath, path.resolve(dir.pathname, newJpgName));
+              files.push(newJpgName);
             }
+
+            manifest.push({
+              name: pathname,
+              files: files,
+            });
           }
+
+          fs.writeFileSync(
+            path.resolve(dir.pathname, "manifest.json"),
+            JSON.stringify(manifest, null, 2),
+          );
         }
       },
       "astro:server:setup": ({ server }) => {
