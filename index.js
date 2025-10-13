@@ -12,6 +12,33 @@ import child_process from "node:child_process";
 export default function email(options) {
   return {
     name: "email",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url;
+        if (!url) return next();
+
+        // Extract the filename from any sub-path
+        const segments = url.split("/").filter(Boolean);
+        const filename = segments[segments.length - 1];
+
+        // Only handle requests for files with extensions
+        if (filename?.includes(".")) {
+          const publicPath = path.join(process.cwd(), "public", filename);
+
+          if (fs.existsSync(publicPath)) {
+            const stat = fs.statSync(publicPath);
+            if (stat.isFile()) {
+              res.setHeader("Content-Length", stat.size);
+              const stream = fs.createReadStream(publicPath);
+              stream.pipe(res);
+              return;
+            }
+          }
+        }
+
+        next();
+      });
+    },
     hooks: {
       "astro:config:setup": ({
         command,
@@ -69,6 +96,18 @@ export default function email(options) {
             );
 
             const files = [name];
+
+            // Add all public files
+            const publicDir = path.resolve("public");
+            if (fs.existsSync(publicDir)) {
+              const publicFiles = fs.readdirSync(publicDir);
+              for (const publicFile of publicFiles) {
+                const publicFilePath = path.resolve(publicDir, publicFile);
+                if (fs.statSync(publicFilePath).isFile()) {
+                  files.push(publicFile);
+                }
+              }
+            }
 
             // check if an .jpg file with the same name exists and copy it to dist too.
             const jpgPath = path.resolve("src/pages", `${pathname}.jpg`);
