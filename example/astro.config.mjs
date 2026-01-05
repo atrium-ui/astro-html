@@ -1,5 +1,5 @@
 import { defineConfig } from "astro/config";
-import email from "astro-email";
+import email from "astro-html";
 
 // https://astro.build/config
 export default defineConfig({

@@ -1,18 +1,18 @@
-# astro-email
+# astro-html
 
 Integration for Astro to Generate HTML emails with React ([react-email](https://github.com/resend/react-email)).
 
 ## Installation
 
 ```sh
-npm i astro-email
+npm i astro-html
 ```
 
 ## Usage
 
 ```javascript
 import { defineConfig } from "astro/config";
-import email from "astro-email";
+import email from "astro-html";
 
 // https://astro.build/config
 export default defineConfig({
@@ -49,7 +49,7 @@ export const partial = true;
 
 import * as React from "react";
 import { Body, Container, Heading, Link, Text } from "@react-email/components";
-import Mail from "astro-email/Mail.astro";
+import Mail from "astro-html/Mail.astro";
 
 const fontFamily =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif";

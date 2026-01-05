@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "astro": "^4.3.6",
-		"astro-email": "workspace:*",
+		"astro-html": "workspace:*",
 		"@react-email/components": "^0.0.14"
 	},
 	"devDependencies": {

@@ -15,7 +15,7 @@ const icon = `
 `;
 
 export default {
-  id: 'astro-email',
+  id: 'astro-html',
   name: 'Export emails',
   icon,
   init(canvas, eventTarget) {

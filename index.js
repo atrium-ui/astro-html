@@ -48,7 +48,7 @@ export default function email(options) {
         addDevToolbarApp,
       }) => {
         addRenderer({
-          name: "astro-email/react",
+          name: "astro-html/react",
           serverEntrypoint: "@astrojs/react/server.js",
         });
 
@@ -70,10 +70,10 @@ export default function email(options) {
 
         injectRoute({
           pattern: "/",
-          entrypoint: "astro-email/index.astro",
+          entrypoint: "astro-html/index.astro",
         });
 
-        addDevToolbarApp("astro-email/toolbar.js");
+        addDevToolbarApp("astro-html/toolbar.js");
       },
       "astro:build:done": async ({ dir, pages }) => {
         if (options.filename) {
@@ -135,7 +135,7 @@ export default function email(options) {
         }
       },
       "astro:server:setup": ({ server }) => {
-        server.ws.on("astro-dev-toolbar:astro-email:toggled", (data) => {
+        server.ws.on("astro-dev-toolbar:astro-html:toggled", (data) => {
           if (data.state === true) {
             child_process.exec("astro build");
           }
@@ -150,7 +150,7 @@ function optionsPlugin(experimentalReactChildren) {
   const virtualModule = "astro:react:opts";
   const virtualModuleId = `\0${virtualModule}`;
   return {
-    name: "astro-email/react:opts",
+    name: "astro-html/react:opts",
     resolveId(id) {
       if (id === virtualModule) {
         return virtualModuleId;
