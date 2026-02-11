@@ -1,0 +1,386 @@
+---
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { tests as testsEnabled } from "astro-html:options";
+import type { BannerAsset } from "./tests/runner";
+
+interface Props {
+    templates: Array<{ name: string; config?: any; params?: any }>;
+}
+
+const { templates } = Astro.props;
+
+const DIST_ASSETS_PATH = path.join(process.cwd(), "dist/assets");
+
+const assets: BannerAsset[] = [];
+
+if (testsEnabled && fs.existsSync(DIST_ASSETS_PATH)) {
+    const isDev = import.meta.env.DEV;
+    const assetPrefix = isDev ? '/dist' : '';
+    const zipFiles = fs.readdirSync(DIST_ASSETS_PATH)
+        .filter(file => file.endsWith('.zip'));
+    
+    for (const zipFile of zipFiles) {
+        const name = zipFile.replace('.zip', '');
+        const previewPath = name.replace(/_([^_]+)$/, '/$1');
+        assets.push({
+            name: previewPath,
+            previewUrl: `/${previewPath}.html`,
+            zipUrl: `${assetPrefix}/assets/${zipFile}`,
+            placeholderUrl: `${assetPrefix}/assets/${zipFile.replace('.zip', '.jpg')}`,
+        });
+    }
+}
+---
+
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <button id="download-assets" class="download-button" data-has-assets="true">
+            Download All Assets
+        </button>
+    </div>
+    {
+        templates.map((template, index) => {
+            const path = template?.name.replace(".astro", "");
+            return (
+                <div class="button" data-template={path}>
+                    <a href={`#${path}`}>
+                        <span class="template-number">{String(index + 1).padStart(2, '0')}</span>
+                        <span class="template-name">{path}</span>
+                    </a>
+                    {testsEnabled && (
+                        <span class="test-status" data-template-test={path}>
+                            <span class="test-status-icon">...</span>
+                        </span>
+                    )}
+                    <a target="_blank" href={path} class="template-link">
+                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1em" height="1em" style="margin-bottom:-2px;" viewBox="0 0 15 15">
+                            <defs>
+                                <clipPath id="clip-path">
+                                    <rect id="Rectangle_1687" data-name="Rectangle 1687" width="15" height="15" transform="translate(11726 152)" fill="none"/>
+                                </clipPath>
+                            </defs>
+                            <g id="Mask_Group_3" data-name="Mask Group 3" transform="translate(-11726 -152)" clip-path="url(#clip-path)">
+                                <g id="Group_422" data-name="Group 422" fill="currentColor">
+                                    <path id="Path_4182" data-name="Path 4182" d="M14.6,14H7.4A2.4,2.4,0,0,1,5,11.6V4.4A2.4,2.4,0,0,1,7.4,2h2.8V3.2H7.4A1.2,1.2,0,0,0,6.2,4.4v7.2a1.2,1.2,0,0,0,1.2,1.2h7.2a1.2,1.2,0,0,0,1.2-1.2V9H17v2.6A2.4,2.4,0,0,1,14.6,14Z" transform="translate(11722 152)"/>
+                                    <path id="Path_4181" data-name="Path 4181" d="M3.385,9.591V1.927L.963,4.349a.564.564,0,0,1-.8-.8L3.54.176a.564.564,0,0,1,.684-.1h0l.01.006,0,0,.007,0,.006,0,0,0L4.264.1h0a.567.567,0,0,1,.083.069L7.733,3.55a.564.564,0,0,1-.8.8L4.513,1.926V9.591a.564.564,0,1,1-1.128,0Z" transform="translate(11737.298 150.117) rotate(45)"/>
+                                </g>
+                            </g>
+                        </svg>
+                    </a>
+                </div>
+            );
+        })
+    }
+</div>
+
+{testsEnabled && (
+    <div id="test-tooltip" class="test-tooltip"></div>
+)}
+
+{testsEnabled && (
+    <script id="assets-data" type="application/json" set:html={JSON.stringify(assets)} />
+)}
+
+{testsEnabled && (
+    <script>
+        import { runTestsOnAssets } from './tests/runner';
+
+        const assetsData = JSON.parse(document.getElementById('assets-data')!.textContent!);
+        const tooltip = document.getElementById('test-tooltip')!;
+        const tooltipData = new Map<string, string>();
+
+        document.addEventListener('mouseover', (e) => {
+            const status = (e.target as Element).closest('.test-status');
+            if (!status) return;
+
+            const name = status.getAttribute('data-template-test')!;
+            const content = tooltipData.get(name);
+            if (!content) return;
+
+            tooltip.innerHTML = content;
+            tooltip.style.display = 'block';
+
+            const sidebar = document.getElementById('sidebar')!;
+            const sidebarRect = sidebar.getBoundingClientRect();
+            const rect = status.getBoundingClientRect();
+            tooltip.style.left = `${sidebarRect.right + 8}px`;
+            tooltip.style.top = `${rect.top - 6}px`;
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const status = (e.target as Element).closest('.test-status');
+            if (!status) return;
+            tooltip.style.display = 'none';
+        });
+
+        async function runTests() {
+            const reports = await runTestsOnAssets(assetsData);
+
+            for (const report of reports) {
+                const statusEl = document.querySelector(`[data-template-test="${report.name}"]`);
+                if (!statusEl) continue;
+
+                const iconEl = statusEl.querySelector('.test-status-icon')!;
+                const hasFailed = !report.passed;
+                const hasWarning = report.warningCount > 0;
+
+                if (hasFailed) {
+                    iconEl.textContent = '✗';
+                    iconEl.classList.add('failed');
+                    const lines = report.results
+                        .filter(r => !r.result.passed)
+                        .map(r => `✗ ${r.testName}: ${r.result.message}`);
+                    tooltipData.set(report.name, lines.join('<br>'));
+                } else if (hasWarning) {
+                    iconEl.textContent = '⚠';
+                    iconEl.classList.add('warn');
+                    const lines = report.results
+                        .filter(r => r.result.isWarning)
+                        .map(r => `⚠ ${r.testName}: ${r.result.message}`);
+                    tooltipData.set(report.name, lines.join('<br>'));
+                } else {
+                    iconEl.textContent = '✓';
+                    iconEl.classList.add('passed');
+                    tooltipData.set(report.name, 'All tests passed');
+                }
+            }
+        }
+
+        runTests();
+    </script>
+)}
+
+<style>
+    .sidebar {
+        margin: 8px;
+        border-radius: 8px;
+        background: #fff;
+        padding: 1rem 0.75rem;
+        box-sizing: border-box;
+        border-right: 1px solid #e0e0e0;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        max-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .sidebar-header {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .download-button {
+        appearance: none;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        min-height: 2.25rem;
+    }
+
+    .download-button:hover:not(:disabled) {
+        background: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+    }
+
+    .download-button:disabled {
+        opacity: 0.8;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+        background: #6c757d;
+    }
+
+    a[href] {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .button {
+        display: flex;
+        box-sizing: border-box;
+        appearance: none;
+        width: 100%;
+        background: transparent;
+        color: inherit;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0px 4px 0px 6px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+
+    .button a[href^="#"] {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+        min-height: 2rem;
+    }
+
+    .template-number {
+        font-size: 0.65rem;
+        opacity: 0.6;
+        min-width: 1rem;
+        text-align: center;
+    }
+
+    .template-name {
+        flex: 1;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 0.5rem;
+    }
+
+    .button.active {
+        background: #007bff;
+        color: #fff;
+        border-color: #007bff;
+    }
+
+    .button.active .template-number {
+        opacity: 0.9;
+    }
+
+    .template-link {
+        font-size: 0.65rem;
+        padding: 8px 10px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .template-link:hover {
+        background: #8282823e;
+    }
+
+    .button:hover {
+        box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .button:active {
+        transition: none;
+        box-shadow: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .sidebar {
+            background-color: hsl(258, 4%, 14%);
+            border-right: 1px solid #000000;
+        }
+
+        .button {
+            border: 1px solid #4b4b4b;
+        }
+
+        .button:hover {
+            background: #3f3f3f;
+        }
+
+        .button.active {
+            background: #0066cc;
+            border-color: #0066cc;
+        }
+
+        .download-button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .download-button:disabled {
+            background: #6c757d;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 999;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            margin: 0;
+            border-radius: 0;
+            max-width: 85vw;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+            box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+        }
+    }
+
+    .test-status {
+        padding: 4px 6px;
+        cursor: default;
+        font-size: 0.75rem;
+        line-height: 1;
+    }
+
+    .test-status-icon {
+        opacity: 0.4;
+        font-size: 0.7rem;
+    }
+
+    .test-status-icon.passed {
+        color: #22c55e;
+        opacity: 1;
+    }
+
+    .test-status-icon.failed {
+        color: #ef4444;
+        opacity: 1;
+    }
+
+    .test-status-icon.warn {
+        color: #eab308;
+        opacity: 1;
+    }
+
+    .button.active .test-status-icon.passed {
+        color: #86efac;
+    }
+
+    .button.active .test-status-icon.failed {
+        color: #fca5a5;
+    }
+
+    .button.active .test-status-icon.warn {
+        color: #fde047;
+    }
+</style>
+
+<style is:global>
+    .test-tooltip {
+        display: none;
+        position: fixed;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font-size: 0.65rem;
+        font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        padding: 8px 10px;
+        border-radius: 6px;
+        white-space: nowrap;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        line-height: 1.6;
+        pointer-events: none;
+    }
+</style>

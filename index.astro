@@ -1,6 +1,7 @@
 ---
 import fs from "node:fs";
 import path from "node:path";
+import Sidebar from "./Sidebar.astro";
 
 let failed = false;
 
@@ -113,6 +114,7 @@ if (failed) {
 
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>Astro Email</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -128,6 +130,114 @@ if (failed) {
         )}</script>
       `}
     />
+    
+    <style>
+      body {
+        font-family: sans-serif, Arial;
+        height: 100vh;
+        margin: 0;
+        overscroll-behavior: none;
+        overflow: hidden;
+        font-size: 1rem;
+      }
+
+      body {
+        background-color: #e5e5f7;
+        background-image: linear-gradient(#eee 1px, transparent 1px), linear-gradient(to right, #eee 1px, #fff 1px);
+        background-size: 20px 20px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: hsl(258, 7%, 10%);
+          color: #fff;
+        }
+      }
+
+      iframe {
+        border: none;
+        max-height: 100%;
+        max-width: 100%;
+        flex: none;
+      }
+
+      h1 {
+        opacity: 0.65;
+        font-size: 0.65rem;
+        font-weight: normal;
+        text-transform: uppercase;
+        margin: 0;
+      }
+
+      .preview-header {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 5px 20px;
+        font-size: 0.75rem;
+        color: #666;
+      }
+
+      .preview {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        justify-content: center;
+        justify-items: center;
+        height: 100%;
+        margin: 0 20px;
+      }
+
+      .layout {
+        height: 100%;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: 1fr;
+      }
+
+      .mobile-menu-toggle {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #007bff;
+        color: white;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+      }
+
+      .mobile-menu-toggle:active {
+        transform: scale(0.95);
+      }
+
+      @media (max-width: 768px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .mobile-menu-toggle {
+          display: flex;
+        }
+
+        .preview {
+          margin: 0;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .mobile-menu-toggle {
+          background: #0066cc;
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+        }
+      }
+    </style>
   </head>
 
   <body>
@@ -138,42 +248,7 @@ if (failed) {
     </button>
 
     <div class="layout">
-      <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-          <h1>Templates</h1>
-          <button id="download-assets" class="download-button" data-has-assets="true">
-            Download All Assets
-          </button>
-        </div>
-        {
-          templates.map((template, index) => {
-            const path = template?.name.replace(".astro", "");
-            return (
-              <div class="button" data-template={path}>
-                <a href={`#${path}`}>
-                  <span class="template-number">{String(index + 1).padStart(2, '0')}</span>
-                  <span class="template-name">{path}</span>
-                </a>
-                <a target="_blank" href={path} class="template-link">
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1em" height="1em" style="margin-bottom:-2px;" viewBox="0 0 15 15">
-                    <defs>
-                      <clipPath id="clip-path">
-                        <rect id="Rectangle_1687" data-name="Rectangle 1687" width="15" height="15" transform="translate(11726 152)" fill="none"/>
-                      </clipPath>
-                    </defs>
-                    <g id="Mask_Group_3" data-name="Mask Group 3" transform="translate(-11726 -152)" clip-path="url(#clip-path)">
-                      <g id="Group_422" data-name="Group 422" fill="currentColor">
-                        <path id="Path_4182" data-name="Path 4182" d="M14.6,14H7.4A2.4,2.4,0,0,1,5,11.6V4.4A2.4,2.4,0,0,1,7.4,2h2.8V3.2H7.4A1.2,1.2,0,0,0,6.2,4.4v7.2a1.2,1.2,0,0,0,1.2,1.2h7.2a1.2,1.2,0,0,0,1.2-1.2V9H17v2.6A2.4,2.4,0,0,1,14.6,14Z" transform="translate(11722 152)"/>
-                        <path id="Path_4181" data-name="Path 4181" d="M3.385,9.591V1.927L.963,4.349a.564.564,0,0,1-.8-.8L3.54.176a.564.564,0,0,1,.684-.1h0l.01.006,0,0,.007,0,.006,0,0,0L4.264.1h0a.567.567,0,0,1,.083.069L7.733,3.55a.564.564,0,0,1-.8.8L4.513,1.926V9.591a.564.564,0,1,1-1.128,0Z" transform="translate(11737.298 150.117) rotate(45)"/>
-                      </g>
-                    </g>
-                  </svg>
-                </a>
-              </div>
-            );
-          })
-        }
-      </div>
+      <Sidebar templates={templates} />
 
       <div class="preview">
         <div id="display-width" class="preview-header"></div>
@@ -316,297 +391,9 @@ if (failed) {
               });
             });
           }
+
         </script>
       </div>
     </div>
-
-    <style>
-      body {
-        font-family: sans-serif, Arial;
-        height: 100vh;
-        margin: 0;
-        overscroll-behavior: none;
-        overflow: hidden;
-        font-size: 1rem;
-      }
-
-      body {
-        background-color: #e5e5f7;
-        background-image: linear-gradient(#eee 1px, transparent 1px), linear-gradient(to right, #eee 1px, #fff 1px);
-        background-size: 20px 20px;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        body {
-          background-color: hsl(258, 7%, 10%);
-          color: #fff;
-        }
-      }
-
-      iframe {
-        border: none;
-        max-height: 100%;
-        max-width: 100%;
-        flex: none;
-      }
-
-      h1 {
-        opacity: 0.65;
-        font-size: 0.65rem;
-        font-weight: normal;
-        text-transform: uppercase;
-        margin: 0;
-      }
-
-      .preview-header {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 5px 20px;
-        font-size: 0.75rem;
-        color: #666;
-      }
-
-      .preview {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        justify-content: center;
-        justify-items: center;
-        height: 100%;
-        margin: 0 20px;
-      }
-
-      .layout {
-        height: 100%;
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        grid-template-rows: 1fr;
-      }
-
-      .sidebar {
-        margin: 8px;
-        border-radius: 8px;
-        background: #fff;
-        padding: 1rem 0.75rem;
-        box-sizing: border-box;
-        border-right: 1px solid #e0e0e0;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        max-height: 100vh;
-        overflow-y: auto;
-      }
-
-      .sidebar-header {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .download-button {
-        appearance: none;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        min-height: 2.25rem;
-      }
-
-      .download-button:hover:not(:disabled) {
-        background: #0056b3;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-      }
-
-      .download-button:disabled {
-        opacity: 0.8;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-        background: #6c757d;
-      }
-
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-
-      @media (prefers-color-scheme: dark) {
-        .sidebar {
-          background-color: hsl(258, 4%, 14%);
-          border-right: 1px solid #000000;
-        }
-      }
-
-      a[href] {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .button,
-      button {
-        display: inline-block;
-        box-sizing: border-box;
-        appearance: none;
-        width: 100%;
-        background: transparent;
-        color: inherit;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0px 4px 0px 6px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
-        transition: all 0.2s;
-      }
-
-      .button a[href^="#"] {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        flex: 1;
-        min-height: 2rem;
-      }
-
-      .template-number {
-        font-size: 0.75rem;
-        opacity: 0.6;
-        font-weight: 600;
-        min-width: 1.5rem;
-        text-align: center;
-      }
-
-      .template-name {
-        flex: 1;
-        font-size: 0.8rem;
-      }
-
-      .button.active {
-        background: #007bff;
-        color: #fff;
-        border-color: #007bff;
-      }
-
-      .button.active .template-number {
-        opacity: 0.9;
-      }
-
-      .template-link {
-        font-size: 0.65rem;
-        padding: 8px 10px;
-        border-radius: 8px;
-        transition: all 0.2s;
-      }
-
-      .template-link:hover {
-        background: #8282823e;
-      }
-
-      .button:hover,
-      button:hover {
-        box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.04);
-      }
-
-      .button:active,
-      button:active {
-        transition: none;
-        box-shadow: none;
-      }
-
-      .mobile-menu-toggle {
-        display: none;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 1000;
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: #007bff;
-        color: white;
-        border: none;
-        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
-        cursor: pointer;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.2s;
-      }
-
-      .mobile-menu-toggle:active {
-        transform: scale(0.95);
-      }
-
-      @media (max-width: 768px) {
-        .layout {
-          grid-template-columns: 1fr;
-        }
-
-        .sidebar {
-          position: fixed;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          z-index: 999;
-          transform: translateX(-100%);
-          transition: transform 0.3s ease;
-          margin: 0;
-          border-radius: 0;
-          width: 280px;
-          max-width: 85vw;
-        }
-
-        .sidebar.open {
-          transform: translateX(0);
-          box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .mobile-menu-toggle {
-          display: flex;
-        }
-
-        .preview {
-          margin: 0;
-        }
-      }
-
-      @media (prefers-color-scheme: dark) {
-        button {
-          border: 1px solid #4b4b4b;
-        }
-
-        button:hover {
-          background: #3f3f3f;
-        }
-
-        .button.active {
-          background: #0066cc;
-          border-color: #0066cc;
-        }
-
-        .download-button:hover:not(:disabled) {
-          background: #0056b3;
-        }
-
-        .download-button:disabled {
-          background: #6c757d;
-        }
-
-        .mobile-menu-toggle {
-          background: #0066cc;
-          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
-        }
-      }
-    </style>
   </body>
 </html>

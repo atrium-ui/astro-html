@@ -7,6 +7,7 @@ import child_process from "node:child_process";
 /**
  * @param {object} options
  * @param {string | ((name: string) => string)} options.filename - The filename to use for the output files. Use `[name]` to insert the page name.
+ * @param {boolean} [options.tests] - Enable banner test indicators in the sidebar.
  * @returns {import('astro').AstroIntegration}
  */
 export default function email(options) {
@@ -31,6 +32,7 @@ export default function email(options) {
               react(),
               optionsPlugin(false), // required for @astrojs/react/server.js to work.
               publicAssetsPlugin(),
+              htmlOptionsPlugin(options),
             ],
             build: {
               assetsInlineLimit: 1024 * 20, // inline all assets
@@ -153,6 +155,27 @@ function optionsPlugin(experimentalReactChildren) {
           code: `export default {
 						experimentalReactChildren: ${JSON.stringify(experimentalReactChildren)}
 					}`,
+        };
+      }
+    },
+  };
+}
+
+/** @type {(options: object) => vite.Plugin} */
+function htmlOptionsPlugin(options) {
+  const virtualModule = "astro-html:options";
+  const virtualModuleId = `\0${virtualModule}`;
+  return {
+    name: "astro-html/options",
+    resolveId(id) {
+      if (id === virtualModule) {
+        return virtualModuleId;
+      }
+    },
+    load(id) {
+      if (id === virtualModuleId) {
+        return {
+          code: `export const tests = ${JSON.stringify(!!options.tests)};`,
         };
       }
     },
