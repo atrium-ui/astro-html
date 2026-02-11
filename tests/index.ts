@@ -4,6 +4,7 @@ import { placeholderTest } from "./placeholder.test";
 import { clickTagTest } from "./clicktag.test";
 import { targetBlankTest } from "./target-blank.test";
 import { hrefPatternTest } from "./href-pattern.test";
+import { externalAssetsTest } from "./external-assets.test";
 
 export const allTests: BannerTest[] = [
     fileSizeTest,
@@ -11,6 +12,7 @@ export const allTests: BannerTest[] = [
     clickTagTest,
     targetBlankTest,
     hrefPatternTest,
+    externalAssetsTest,
 ];
 
 export * from "./types";
@@ -22,4 +24,5 @@ export {
     clickTagTest,
     targetBlankTest,
     hrefPatternTest,
+    externalAssetsTest,
 };
