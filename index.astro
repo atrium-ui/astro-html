@@ -114,6 +114,8 @@ if (failed) {
 <html>
   <head>
     <title>Astro Email</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <Fragment
       set:html={`
@@ -129,8 +131,14 @@ if (failed) {
   </head>
 
   <body>
+    <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12h18M3 6h18M3 18h18"/>
+      </svg>
+    </button>
+
     <div class="layout">
-      <div class="sidebar">
+      <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <h1>Templates</h1>
           <button id="download-assets" class="download-button" data-has-assets="true">
@@ -289,6 +297,25 @@ if (failed) {
           window.addEventListener("hashchange", () => {
             showTemplate(location.hash.substring(1));
           });
+
+          // Mobile menu toggle
+          const menuToggle = document.querySelector("#mobile-menu-toggle");
+          const sidebar = document.querySelector("#sidebar");
+
+          if (menuToggle && sidebar) {
+            menuToggle.addEventListener("click", () => {
+              sidebar.classList.toggle("open");
+            });
+
+            // Close sidebar when clicking a template link on mobile
+            document.querySelectorAll('.button a[href^="#"]').forEach(link => {
+              link.addEventListener("click", () => {
+                if (window.innerWidth <= 768) {
+                  sidebar.classList.remove("open");
+                }
+              });
+            });
+          }
         </script>
       </div>
     </div>
@@ -364,6 +391,8 @@ if (failed) {
         box-sizing: border-box;
         border-right: 1px solid #e0e0e0;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        max-height: 100vh;
+        overflow-y: auto;
       }
 
       .sidebar-header {
@@ -495,6 +524,62 @@ if (failed) {
         box-shadow: none;
       }
 
+      .mobile-menu-toggle {
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #007bff;
+        color: white;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+      }
+
+      .mobile-menu-toggle:active {
+        transform: scale(0.95);
+      }
+
+      @media (max-width: 768px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          z-index: 999;
+          transform: translateX(-100%);
+          transition: transform 0.3s ease;
+          margin: 0;
+          border-radius: 0;
+          width: 280px;
+          max-width: 85vw;
+        }
+
+        .sidebar.open {
+          transform: translateX(0);
+          box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .mobile-menu-toggle {
+          display: flex;
+        }
+
+        .preview {
+          margin: 0;
+        }
+      }
+
       @media (prefers-color-scheme: dark) {
         button {
           border: 1px solid #4b4b4b;
@@ -515,6 +600,11 @@ if (failed) {
 
         .download-button:disabled {
           background: #6c757d;
+        }
+
+        .mobile-menu-toggle {
+          background: #0066cc;
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
       }
     </style>
