@@ -12,33 +12,6 @@ import child_process from "node:child_process";
 export default function email(options) {
   return {
     name: "email",
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url;
-        if (!url) return next();
-
-        // Extract the filename from any sub-path
-        const segments = url.split("/").filter(Boolean);
-        const filename = segments[segments.length - 1];
-
-        // Only handle requests for files with extensions
-        if (filename?.includes(".")) {
-          const publicPath = path.join(process.cwd(), "public", filename);
-
-          if (fs.existsSync(publicPath)) {
-            const stat = fs.statSync(publicPath);
-            if (stat.isFile()) {
-              res.setHeader("Content-Length", stat.size);
-              const stream = fs.createReadStream(publicPath);
-              stream.pipe(res);
-              return;
-            }
-          }
-        }
-
-        next();
-      });
-    },
     hooks: {
       "astro:config:setup": ({
         command,
@@ -57,6 +30,7 @@ export default function email(options) {
             plugins: [
               react(),
               optionsPlugin(false), // required for @astrojs/react/server.js to work.
+              publicAssetsPlugin(),
             ],
             build: {
               assetsInlineLimit: 1024 * 20, // inline all assets
@@ -78,12 +52,24 @@ export default function email(options) {
       "astro:build:done": async ({ dir, pages }) => {
         if (options.filename) {
           const manifest = [];
+          const publicDir = path.resolve("public");
+          const publicFiles = [];
+
+          if (fs.existsSync(publicDir)) {
+            const files = fs.readdirSync(publicDir);
+            for (const file of files) {
+              const publicFilePath = path.resolve(publicDir, file);
+              if (fs.statSync(publicFilePath).isFile()) {
+                publicFiles.push(file);
+              }
+            }
+          }
 
           for (const page of pages) {
             const pathname = page.pathname;
             const basename = pathname.split(".")[0];
 
-            if (!pathname) continue; // index has none
+            if (!pathname) continue;
 
             const name =
               typeof options.filename === "string"
@@ -97,19 +83,24 @@ export default function email(options) {
 
             const files = [name];
 
-            // Add all public files
-            const publicDir = path.resolve("public");
-            if (fs.existsSync(publicDir)) {
-              const publicFiles = fs.readdirSync(publicDir);
+            // Copy public files to subdirectories if needed
+            const pathSegments = pathname.split("/").filter(Boolean);
+            if (pathSegments.length > 1) {
+              const subdirPath = path.resolve(
+                dir.pathname,
+                ...pathSegments.slice(0, -1),
+              );
+              fs.mkdirSync(subdirPath, { recursive: true });
+
               for (const publicFile of publicFiles) {
-                const publicFilePath = path.resolve(publicDir, publicFile);
-                if (fs.statSync(publicFilePath).isFile()) {
-                  files.push(publicFile);
-                }
+                const targetPath = path.resolve(subdirPath, publicFile);
+                const sourcePath = path.resolve(publicDir, publicFile);
+                fs.copyFileSync(sourcePath, targetPath);
               }
             }
 
-            // check if an .jpg file with the same name exists and copy it to dist too.
+            files.push(...publicFiles);
+
             const jpgPath = path.resolve("src/pages", `${pathname}.jpg`);
             if (fs.existsSync(jpgPath)) {
               const newJpgName =
@@ -164,6 +155,38 @@ function optionsPlugin(experimentalReactChildren) {
 					}`,
         };
       }
+    },
+  };
+}
+
+/** @type {() => vite.Plugin} */
+function publicAssetsPlugin() {
+  return {
+    name: "astro-html/public-assets",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split("?")[0];
+        if (!url) return next();
+
+        const segments = url.split("/").filter(Boolean);
+        const filename = segments[segments.length - 1];
+
+        if (filename?.includes(".")) {
+          const publicPath = path.join(process.cwd(), "public", filename);
+
+          if (fs.existsSync(publicPath)) {
+            const stat = fs.statSync(publicPath);
+            if (stat.isFile()) {
+              res.setHeader("Content-Length", stat.size);
+              const stream = fs.createReadStream(publicPath);
+              stream.pipe(res);
+              return;
+            }
+          }
+        }
+
+        next();
+      });
     },
   };
 }
