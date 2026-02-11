@@ -31,6 +31,7 @@
 		"Banner.astro",
 		"index.astro",
 		"index.js",
-		"toolbar.js"
+		"toolbar.js",
+		"tests"
 	]
 }
