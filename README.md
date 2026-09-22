@@ -40,6 +40,12 @@ npx astro build
 
 This will generate HTML files for each `.astro` file in the `src/pages` directory.
 
+### Preview sidebar
+
+The dev preview at `/` titles itself after the `name` in your `package.json`. Drop a
+`logo.png` into `public/` to use it as the sidebar logo; without one you get a letter
+badge derived from the project name.
+
 ## Example
 
 ```astro

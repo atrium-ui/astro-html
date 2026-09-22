@@ -70,6 +70,8 @@ async function findTemplates(
 					relativePath ? path.join(relativePath, item) : item
 				).replace(".astro", "");
 
+				const mtime = stat.mtimeMs;
+
 				// Check if getStaticPaths exists and generate multiple pages if so
 				if (
 					exprts.getStaticPaths &&
@@ -87,12 +89,14 @@ async function findTemplates(
 							name: pageName,
 							config: exprts.config,
 							params: pathData.params,
+							mtime,
 						});
 					}
 				} else {
 					results.push({
 						name: templateName,
 						config: exprts.config,
+						mtime,
 					});
 				}
 			}
@@ -107,6 +111,27 @@ async function findTemplates(
 
 const templates = await findTemplates("src/pages", "", 0, 2);
 
+// The sidebar is titled after the project astro-html is installed in.
+function readProjectName() {
+	try {
+		const pkg = JSON.parse(
+			fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"),
+		);
+		// Drop the npm scope: "@acme/newsletters" reads better as "newsletters".
+		const name = String(pkg.name || "").replace(/^@[^/]+\//, "");
+		if (name) return name;
+	} catch {
+		// No package.json, or it is unreadable: fall back to the generic title.
+	}
+	return "Astro HTML";
+}
+
+const projectName = readProjectName();
+const projectInitial = (projectName.match(/[a-z0-9]/i)?.[0] || "A").toUpperCase();
+
+// A "logo.png" in the project's public dir replaces the generated letter badge.
+const hasLogo = fs.existsSync(path.join(process.cwd(), "public", "logo.png"));
+
 if (failed) {
 	throw new Error("Failed to build pages");
 }
@@ -118,8 +143,6 @@ let assets: Array<{
 	placeholderUrl: string;
 }> = [];
 
-let testScript = '';
-
 if (testsEnabled) {
 	const DIST_ASSETS_PATH = path.join(process.cwd(), "dist/assets");
 
@@ -128,7 +151,7 @@ if (testsEnabled) {
 		const assetPrefix = isDev ? '/dist' : '';
 		const zipFiles = fs.readdirSync(DIST_ASSETS_PATH)
 			.filter(file => file.endsWith('.zip'));
-		
+
 		for (const zipFile of zipFiles) {
 			const name = zipFile.replace('.zip', '');
 			const previewPath = name.replace(/_([^_]+)$/, '/$1');
@@ -147,7 +170,7 @@ if (testsEnabled) {
   <head>
     <meta charset="UTF-8">
     <title>Astro Email</title>
-    
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <Fragment
@@ -161,7 +184,47 @@ if (testsEnabled) {
         )}</script>
       `}
     />
-    
+
+    <style is:global>
+      :root {
+        --accent: #f97416;
+        --accent-soft: #fdeeda;
+        --accent-ring: rgba(249, 116, 22, 0.25);
+
+        --sidebar-bg: #f7f7f6;
+        --field-bg: #ebebe9;
+        --field-bg-focus: #ffffff;
+        --row-hover: rgba(0, 0, 0, 0.045);
+        --row-hover-strong: rgba(0, 0, 0, 0.09);
+        --line: #e4e4e1;
+        --surface: #ffffff;
+
+        --text: #2f2f2e;
+        --text-muted: #6d6d6a;
+        --text-faint: #9a9a96;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --accent: #fb8c3c;
+          --accent-soft: rgba(249, 116, 22, 0.16);
+          --accent-ring: rgba(249, 116, 22, 0.35);
+
+          --sidebar-bg: hsl(258, 5%, 12%);
+          --field-bg: hsl(258, 5%, 18%);
+          --field-bg-focus: hsl(258, 5%, 21%);
+          --row-hover: rgba(255, 255, 255, 0.06);
+          --row-hover-strong: rgba(255, 255, 255, 0.12);
+          --line: hsl(258, 5%, 20%);
+          --surface: hsl(258, 5%, 14%);
+
+          --text: #e8e8e6;
+          --text-muted: #a2a29e;
+          --text-faint: #75756f;
+        }
+      }
+    </style>
+
     <style>
       body {
         font-family: sans-serif, Arial;
@@ -173,7 +236,7 @@ if (testsEnabled) {
       }
 
       body {
-        background-color: #e5e5f7;
+        background-color: #fff;
         background-image: linear-gradient(#eee 1px, transparent 1px), linear-gradient(to right, #eee 1px, #fff 1px);
         background-size: 20px 20px;
       }
@@ -182,6 +245,9 @@ if (testsEnabled) {
         body {
           background-color: hsl(258, 7%, 10%);
           color: #fff;
+          background-image:
+            linear-gradient(hsl(258, 6%, 17%) 1px, transparent 1px),
+            linear-gradient(to right, hsl(258, 6%, 17%) 1px, hsl(258, 7%, 10%) 1px);
         }
       }
 
@@ -210,12 +276,23 @@ if (testsEnabled) {
       }
 
       .preview {
+        height: 100%;
+        min-width: 0;
+        margin: 0 20px;
+        overflow: hidden;
+      }
+
+      .preview-single {
         display: grid;
         grid-template-rows: auto 1fr;
         justify-content: center;
         justify-items: center;
         height: 100%;
-        margin: 0 20px;
+      }
+
+      .preview-single[hidden],
+      .preview-grid[hidden] {
+        display: none;
       }
 
       .layout {
@@ -234,10 +311,10 @@ if (testsEnabled) {
         width: 56px;
         height: 56px;
         border-radius: 50%;
-        background: #007bff;
+        background: var(--accent);
         color: white;
         border: none;
-        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        box-shadow: 0 4px 12px rgba(249, 116, 22, 0.4);
         cursor: pointer;
         align-items: center;
         justify-content: center;
@@ -262,12 +339,6 @@ if (testsEnabled) {
         }
       }
 
-      @media (prefers-color-scheme: dark) {
-        .mobile-menu-toggle {
-          background: #0066cc;
-          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
-        }
-      }
     </style>
   </head>
 
@@ -280,11 +351,72 @@ if (testsEnabled) {
 
     <div class="layout">
       <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-          <button id="download-assets" class="download-button" data-has-assets="true">
-            Download All Assets
-          </button>
+        <div class="sidebar-brand">
+          {hasLogo
+            ? <img class="brand-logo" src="/logo.png" alt={projectName} width="32" height="32" />
+            : <span class="brand-badge">{projectInitial}</span>}
+          <span class="brand-text">
+            <span class="brand-title" title={projectName}>{projectName}</span>
+            <span class="brand-subtitle">{templates.length} {templates.length === 1 ? "page" : "pages"}</span>
+          </span>
         </div>
+
+        <nav class="sidebar-nav">
+          <button id="grid-toggle" class="nav-row" type="button" title="Preview all pages side by side">
+            <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+            </svg>
+            <span class="nav-label">Grid preview</span>
+          </button>
+
+          <button id="download-assets" class="nav-row" type="button" data-has-assets="true">
+            <svg class="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4"/>
+              <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+            </svg>
+            <span class="nav-label">Download all assets</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-search">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="m20 20-3.5-3.5"/>
+          </svg>
+          <input id="template-search" type="text" placeholder="Quick Search" autocomplete="off" spellcheck="false" />
+          <kbd class="search-hint">&#8984; K</kbd>
+        </div>
+
+        <div class="section-label">
+          <span class="section-label-text">Pages</span>
+          <span class="section-actions">
+            <button id="hierarchy-toggle" class="icon-button" type="button" title="Toggle flat / directory hierarchy">
+              <svg class="icon-flat" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+              </svg>
+              <svg class="icon-tree" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 4h6l2 2h10v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>
+              </svg>
+            </button>
+
+            <button id="sort-toggle" class="icon-button" type="button" title="Toggle sorting by name / date modified">
+              <svg class="icon-name" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 4v16M3 17l3 3 3-3M13 6h8M13 12h6M13 18h4"/>
+              </svg>
+              <svg class="icon-modified" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 2"/>
+              </svg>
+            </button>
+          </span>
+        </div>
+
+        <div class="template-list" id="template-list">
         {
           templates.map((template, index) => {
             const path = template?.name.replace(".astro", "");
@@ -318,6 +450,9 @@ if (testsEnabled) {
             );
           })
         }
+        </div>
+
+        <p class="list-empty" id="list-empty" hidden>No pages match your search.</p>
       </div>
 
       {testsEnabled && (
@@ -329,8 +464,19 @@ if (testsEnabled) {
       )}
 
       <div class="preview">
-        <div id="display-width" class="preview-header"></div>
-        <iframe width="640px"></iframe>
+        <div class="preview-single" id="preview-single">
+          <div id="display-width" class="preview-header"></div>
+          <iframe width="640px"></iframe>
+        </div>
+
+        <div class="preview-grid" id="preview-grid" hidden>
+          <div class="preview-grid-header">
+            <span class="preview-grid-title" id="preview-grid-title">All pages</span>
+            <span class="preview-grid-count" id="preview-grid-count"></span>
+            <button class="preview-grid-close" id="preview-grid-close" type="button" title="Back to single preview">&times;</button>
+          </div>
+          <div class="preview-grid-items" id="preview-grid-items"></div>
+        </div>
 
         <script>
           const dataString = document.querySelector("#data")?.innerHTML;
@@ -340,19 +486,15 @@ if (testsEnabled) {
           console.debug("data", data);
 
           // Download assets functionality
-          const downloadButton = document.querySelector("#download-assets");
-          const hasAssets = downloadButton && downloadButton.getAttribute("data-has-assets") === "true";
+          const downloadButton = document.querySelector("#download-assets") as HTMLButtonElement | null;
+          const hasAssets = downloadButton?.getAttribute("data-has-assets") === "true";
 
           if (downloadButton) {
+            const downloadLabel = downloadButton.querySelector(".nav-label") as HTMLElement;
+
             if (!hasAssets) {
               downloadButton.disabled = true;
-              downloadButton.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 12 12" style="color: #6c757d;">
-                  <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-                  <path d="M4.5 4.5l3 3M7.5 4.5l-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                No Assets Built
-              `;
+              downloadLabel.textContent = "No assets built";
               downloadButton.title = "Run 'npm run build' to generate downloadable assets";
             } else {
               downloadButton.addEventListener("click", () => {
@@ -365,91 +507,504 @@ if (testsEnabled) {
                 document.body.removeChild(link);
 
                 // Show success feedback
-                const originalText = downloadButton.innerHTML;
-                downloadButton.innerHTML = `
-                  <svg width="12" height="12" viewBox="0 0 12 12" style="color: #22c55e;">
-                    <path d="M2 6l2.5 2.5L9 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  Downloaded!
-                `;
+                const originalText = downloadLabel.textContent;
+                downloadLabel.textContent = "Downloaded!";
+                downloadButton.classList.add("done");
 
                 setTimeout(() => {
-                  downloadButton.innerHTML = originalText;
+                  downloadLabel.textContent = originalText;
+                  downloadButton.classList.remove("done");
                 }, 1500);
               });
             }
           }
 
-          const iframe = document.querySelector("iframe");
+          const iframe = document.querySelector(".preview-single iframe") as HTMLIFrameElement;
           if (!iframe) throw new Error("No iframe found");
 
-          let fixedWidth = undefined;
-          let fixedHeight = undefined;
+          const singleView = document.querySelector("#preview-single") as HTMLElement;
+          const gridView = document.querySelector("#preview-grid") as HTMLElement;
+          const gridItems = document.querySelector("#preview-grid-items") as HTMLElement;
+          const gridTitle = document.querySelector("#preview-grid-title") as HTMLElement;
+          const gridCount = document.querySelector("#preview-grid-count") as HTMLElement;
+          const list = document.querySelector("#template-list") as HTMLElement;
 
-          const updateFormat = (name?: string) => {
-            const config = data.pages.find((temp: { name: string }) => {
-              return temp.name === `${name}`;
-            })?.config;
+          const pageByName = new Map<string, any>(
+            data.pages.map((page: { name: string }) => [page.name, page])
+          );
 
-            fixedWidth = config.width;
-            fixedHeight = config.height;
-            const width = fixedWidth || iframe?.offsetWidth || 0;
-            const height = fixedHeight || iframe?.offsetHeight || 0;
+          // The buttons rendered on the server. They are moved around in the DOM
+          // when the layout changes, never re-created, so async test results that
+          // get written into them stay intact.
+          const buttonEls = Array.from(list.querySelectorAll<HTMLElement>(".button"));
+          const allNames = buttonEls.map((el) => el.dataset.template!);
 
-            const display = document.querySelector("#display-width");
-            if(display) {
-              display.innerHTML = `${width}x${height}px`;
+          const DEFAULT_WIDTH = 640;
+          const DEFAULT_HEIGHT = 800;
+
+          function sizeOf(name: string) {
+            const config = pageByName.get(name)?.config;
+            return { width: config?.width, height: config?.height };
+          }
+
+          /* ---------------------------------------------------------------- *
+           * Sidebar: hierarchy + sorting
+           * ---------------------------------------------------------------- */
+
+          const HIERARCHY_KEY = "astro-html:hierarchy";
+          const SORT_KEY = "astro-html:sort";
+          const COLLAPSED_KEY = "astro-html:collapsed";
+
+          let hierarchy = localStorage.getItem(HIERARCHY_KEY) === "tree" ? "tree" : "flat";
+          let sortMode = localStorage.getItem(SORT_KEY) === "modified" ? "modified" : "name";
+
+          let collapsed = new Set<string>();
+          try {
+            collapsed = new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) || "[]"));
+          } catch {}
+
+          let query = "";
+
+          function matchesQuery(name: string) {
+            return !query || name.toLowerCase().includes(query);
+          }
+
+          // A stable badge colour per folder, picked from a small spread of hues
+          // so neighbouring folders stay easy to tell apart.
+          const BADGE_HUES = [16, 45, 95, 165, 200, 260, 320];
+
+          function hueOf(text: string) {
+            let hash = 0;
+            for (let i = 0; i < text.length; i++) {
+              hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+            }
+            return BADGE_HUES[hash % BADGE_HUES.length];
+          }
+
+          function mtimeOf(name: string) {
+            return pageByName.get(name)?.mtime || 0;
+          }
+
+          function sortNames(names: string[]) {
+            const sorted = names.slice();
+            if (sortMode === "modified") {
+              sorted.sort((a, b) => mtimeOf(b) - mtimeOf(a) || a.localeCompare(b));
+            } else {
+              sorted.sort((a, b) => a.localeCompare(b));
+            }
+            return sorted;
+          }
+
+          type TreeNode = {
+            prefix: string;
+            children: Map<string, TreeNode>;
+            items: string[];
+          };
+
+          function buildTree(names: string[]): TreeNode {
+            const root: TreeNode = { prefix: "", children: new Map(), items: [] };
+
+            for (const name of names) {
+              const parts = name.split("/");
+              let node = root;
+
+              for (let i = 0; i < parts.length - 1; i++) {
+                const key = parts[i];
+                let child = node.children.get(key);
+                if (!child) {
+                  child = {
+                    prefix: parts.slice(0, i + 1).join("/"),
+                    children: new Map(),
+                    items: [],
+                  };
+                  node.children.set(key, child);
+                }
+                node = child;
+              }
+
+              node.items.push(name);
             }
 
-            if(iframe) {
-              iframe.width = `${width}`;
-              iframe.height = `${height}`;
+            return root;
+          }
+
+          function collectNames(node: TreeNode, into: string[] = []) {
+            into.push(...node.items);
+            for (const child of node.children.values()) collectNames(child, into);
+            return into;
+          }
+
+          function renderNode(node: TreeNode, parent: DocumentFragment | HTMLElement, depth: number) {
+            const groups = Array.from(node.children.entries());
+
+            groups.sort(([aKey, a], [bKey, b]) => {
+              if (sortMode === "modified") {
+                const aTime = Math.max(0, ...collectNames(a).map(mtimeOf));
+                const bTime = Math.max(0, ...collectNames(b).map(mtimeOf));
+                if (aTime !== bTime) return bTime - aTime;
+              }
+              return aKey.localeCompare(bKey);
+            });
+
+            for (const [key, child] of groups) {
+              const group = document.createElement("div");
+              group.className = "tree-group";
+              group.dataset.prefix = child.prefix;
+              if (collapsed.has(child.prefix)) group.classList.add("collapsed");
+
+              const header = document.createElement("div");
+              header.className = "tree-group-header";
+              header.style.paddingLeft = `${8 + depth * 12}px`;
+
+              const caret = document.createElement("span");
+              caret.className = "tree-caret";
+              caret.innerHTML =
+                '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+
+              const badge = document.createElement("span");
+              badge.className = "tree-badge";
+              badge.style.setProperty("--badge-hue", String(hueOf(child.prefix)));
+              badge.textContent = key.charAt(0).toUpperCase();
+
+              const label = document.createElement("span");
+              label.className = "tree-group-name";
+              label.textContent = key;
+
+              const names = collectNames(child);
+
+              // While filtering the count reflects what is actually listed.
+              const shown = query ? names.filter(matchesQuery) : names;
+
+              const count = document.createElement("span");
+              count.className = "tree-group-count";
+              count.textContent = String(shown.length);
+
+              group.classList.toggle(
+                "filtered-out",
+                !names.some(matchesQuery) && !matchesQuery(child.prefix)
+              );
+
+              // While searching, everything that still matches stays open.
+              if (query) group.classList.remove("collapsed");
+
+              const gridButton = document.createElement("button");
+              gridButton.type = "button";
+              gridButton.className = "tree-group-grid";
+              gridButton.title = `Preview "${child.prefix}" in a grid`;
+              gridButton.innerHTML =
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">' +
+                '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>' +
+                '<rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+              gridButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                location.hash = `grid:${child.prefix}`;
+              });
+
+              header.append(caret, badge, label, count, gridButton);
+              header.addEventListener("click", () => {
+                if (collapsed.has(child.prefix)) {
+                  collapsed.delete(child.prefix);
+                } else {
+                  collapsed.add(child.prefix);
+                }
+                group.classList.toggle("collapsed", collapsed.has(child.prefix));
+                localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+              });
+
+              const children = document.createElement("div");
+              children.className = "tree-group-children";
+
+              renderNode(child, children, depth + 1);
+
+              group.append(header, children);
+              parent.appendChild(group);
+            }
+
+            for (const name of sortNames(node.items)) {
+              const el = buttonEls.find((button) => button.dataset.template === name)!;
+              const leaf = name.split("/").pop()!;
+              el.querySelector<HTMLElement>(".template-name")!.textContent = leaf;
+              el.style.paddingLeft = `${10 + depth * 12}px`;
+              el.classList.toggle("filtered-out", !matchesQuery(name));
+              parent.appendChild(el);
             }
           }
 
-          let resizeListener: EventListener;
+          function renderList() {
+            const fragment = document.createDocumentFragment();
+
+            if (hierarchy === "tree") {
+              renderNode(buildTree(allNames), fragment, 0);
+            } else {
+              for (const name of sortNames(allNames)) {
+                const el = buttonEls.find((button) => button.dataset.template === name)!;
+                el.querySelector<HTMLElement>(".template-name")!.textContent = name;
+                el.style.paddingLeft = "";
+                el.classList.toggle("filtered-out", !matchesQuery(name));
+                fragment.appendChild(el);
+              }
+            }
+
+            list.replaceChildren(fragment);
+
+            // Renumber over what is actually on screen.
+            const visible = list.querySelectorAll<HTMLElement>(".button:not(.filtered-out)");
+            visible.forEach((el, index) => {
+              el.querySelector<HTMLElement>(".template-number")!.textContent =
+                String(index + 1).padStart(2, "0");
+            });
+
+            emptyState.hidden = visible.length > 0;
+
+            syncActiveState();
+          }
+
+          const hierarchyToggle = document.querySelector("#hierarchy-toggle") as HTMLElement;
+          const sortToggle = document.querySelector("#sort-toggle") as HTMLElement;
+          const gridToggle = document.querySelector("#grid-toggle") as HTMLElement;
+          const search = document.querySelector("#template-search") as HTMLInputElement;
+          const emptyState = document.querySelector("#list-empty") as HTMLElement;
+
+          function syncControls() {
+            hierarchyToggle.dataset.mode = hierarchy;
+            hierarchyToggle.title =
+              hierarchy === "tree"
+                ? "Directory hierarchy — switch to a flat list"
+                : "Flat list — switch to directory hierarchy";
+
+            sortToggle.dataset.mode = sortMode;
+            sortToggle.title =
+              sortMode === "modified"
+                ? "Sorted by date modified — switch to sorting by name"
+                : "Sorted by name — switch to sorting by date modified";
+          }
+
+          search.addEventListener("input", () => {
+            query = search.value.trim().toLowerCase();
+            renderList();
+          });
+
+          search.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            search.value = "";
+            query = "";
+            renderList();
+            search.blur();
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key !== "k" || !(event.metaKey || event.ctrlKey)) return;
+            event.preventDefault();
+            search.focus();
+            search.select();
+          });
+
+          hierarchyToggle.addEventListener("click", () => {
+            hierarchy = hierarchy === "tree" ? "flat" : "tree";
+            localStorage.setItem(HIERARCHY_KEY, hierarchy);
+            syncControls();
+            renderList();
+          });
+
+          sortToggle.addEventListener("click", () => {
+            sortMode = sortMode === "modified" ? "name" : "modified";
+            localStorage.setItem(SORT_KEY, sortMode);
+            syncControls();
+            renderList();
+            if (!gridView.hidden) showGrid(currentPrefix);
+          });
+
+          /* ---------------------------------------------------------------- *
+           * Preview: single
+           * ---------------------------------------------------------------- */
+
+          let resizeListener: EventListener | undefined;
+
+          const updateFormat = (name?: string) => {
+            const { width: fixedWidth, height: fixedHeight } = sizeOf(`${name}`);
+
+            const width = fixedWidth || iframe.offsetWidth || 0;
+            const height = fixedHeight || iframe.offsetHeight || 0;
+
+            const display = document.querySelector("#display-width");
+            if (display) {
+              display.innerHTML = `${width}x${height}px`;
+            }
+
+            iframe.width = `${width}`;
+            iframe.height = `${height}`;
+          }
+
+          let currentTemplate: string | undefined;
+          let currentPrefix: string | null = null;
+
+          function syncActiveState() {
+            const inGrid = !gridView.hidden;
+
+            document.querySelectorAll(".button").forEach((button) => {
+              button.classList.toggle(
+                "active",
+                !inGrid && (button as HTMLElement).dataset.template === currentTemplate
+              );
+            });
+
+            document.querySelectorAll(".tree-group").forEach((group) => {
+              group.classList.toggle(
+                "active",
+                inGrid && currentPrefix !== null && (group as HTMLElement).dataset.prefix === currentPrefix
+              );
+            });
+
+            gridToggle.classList.toggle("active", inGrid);
+          }
 
           function showTemplate(name: string) {
-            if(!iframe) return;
+            gridView.hidden = true;
+            singleView.hidden = false;
+            gridObserver?.disconnect();
 
-            const config = data.pages.find((temp: { name: string }) => {
-              return temp.name === `${name}`;
-            })?.config;
-
-            console.debug(name, config)
+            currentTemplate = name;
+            currentPrefix = null;
 
             updateFormat(name);
 
             iframe.src = `/${name}.html`;
 
-            // Update active state
-            document.querySelectorAll('.button').forEach(button => {
-              button.classList.remove('active');
-            });
+            syncActiveState();
 
-            const activeButton = document.querySelector(`[data-template="${name}"]`);
-            if (activeButton) {
-              activeButton.classList.add('active');
-            }
-
-            window.removeEventListener("resize", resizeListener);
-
+            if (resizeListener) window.removeEventListener("resize", resizeListener);
             resizeListener = () => updateFormat(name);
-
             window.addEventListener("resize", resizeListener);
           }
 
-          const template = location.hash.substring(1);
-          if (template) {
-            showTemplate(template)
-          } else {
-            const first = data.pages[0]?.name.replace(".astro", "");
-            showTemplate(first)
+          /* ---------------------------------------------------------------- *
+           * Preview: grid
+           * ---------------------------------------------------------------- */
+
+          let gridObserver: IntersectionObserver | undefined;
+
+          function createCard(name: string) {
+            const configured = sizeOf(name);
+            const width = configured.width || DEFAULT_WIDTH;
+            const height = configured.height || DEFAULT_HEIGHT;
+
+            const card = document.createElement("div");
+            card.className = "grid-card";
+            card.dataset.template = name;
+            // Cards take the page's own size, so every preview renders 1:1.
+            card.style.width = `${width}px`;
+
+            const header = document.createElement("a");
+            header.className = "grid-card-header";
+            header.href = `#${name}`;
+            header.title = `Open ${name} in the single preview`;
+
+            const label = document.createElement("span");
+            label.className = "grid-card-name";
+            label.textContent = name;
+
+            const size = document.createElement("span");
+            size.className = "grid-card-size";
+            size.textContent = `${width}x${height}`;
+
+            header.append(label, size);
+
+            const stage = document.createElement("div");
+            stage.className = "grid-card-stage";
+            stage.style.height = `${height}px`;
+
+            const frame = document.createElement("iframe");
+            frame.width = String(width);
+            frame.height = String(height);
+            frame.setAttribute("scrolling", "no");
+            frame.dataset.src = `/${name}.html`;
+
+            stage.appendChild(frame);
+            card.append(header, stage);
+
+            return card;
           }
 
-          window.addEventListener("hashchange", () => {
-            showTemplate(location.hash.substring(1));
+          function observeCards() {
+            gridObserver?.disconnect();
+            gridObserver = new IntersectionObserver(
+              (entries) => {
+                for (const entry of entries) {
+                  if (!entry.isIntersecting) continue;
+                  const frame = entry.target.querySelector("iframe") as HTMLIFrameElement;
+                  if (frame && !frame.src && frame.dataset.src) {
+                    frame.src = frame.dataset.src;
+                  }
+                  gridObserver!.unobserve(entry.target);
+                }
+              },
+              { root: gridItems, rootMargin: "300px" }
+            );
+
+            for (const card of Array.from(gridItems.children)) {
+              gridObserver.observe(card);
+            }
+          }
+
+          function showGrid(prefix: string | null) {
+            singleView.hidden = true;
+            gridView.hidden = false;
+
+            currentPrefix = prefix;
+
+            if (resizeListener) {
+              window.removeEventListener("resize", resizeListener);
+              resizeListener = undefined;
+            }
+
+            const names = sortNames(
+              allNames.filter((name) =>
+                !prefix ? true : name === prefix || name.startsWith(`${prefix}/`)
+              )
+            );
+
+            gridTitle.textContent = prefix || "All pages";
+            gridCount.textContent = `${names.length} ${names.length === 1 ? "page" : "pages"}`;
+
+            gridItems.replaceChildren(...names.map(createCard));
+            observeCards();
+
+            syncActiveState();
+          }
+
+          gridToggle.addEventListener("click", () => {
+            if (!gridView.hidden) {
+              location.hash = currentTemplate || allNames[0] || "";
+            } else {
+              location.hash = "grid";
+            }
           });
+
+          document.querySelector("#preview-grid-close")!.addEventListener("click", () => {
+            location.hash = currentTemplate || allNames[0] || "";
+          });
+
+          /* ---------------------------------------------------------------- *
+           * Routing
+           * ---------------------------------------------------------------- */
+
+          function route() {
+            const hash = decodeURIComponent(location.hash.substring(1));
+
+            if (hash === "grid") return showGrid(null);
+            if (hash.startsWith("grid:")) return showGrid(hash.slice("grid:".length));
+            if (hash) return showTemplate(hash);
+
+            const first = allNames[0];
+            if (first) showTemplate(first);
+          }
+
+          syncControls();
+          renderList();
+          route();
+
+          window.addEventListener("hashchange", route);
 
           // Mobile menu toggle
           const menuToggle = document.querySelector("#mobile-menu-toggle");
@@ -461,139 +1016,330 @@ if (testsEnabled) {
             });
 
             // Close sidebar when clicking a template link on mobile
-            document.querySelectorAll('.button a[href^="#"]').forEach(link => {
-              link.addEventListener("click", () => {
-                if (window.innerWidth <= 768) {
-                  sidebar.classList.remove("open");
-                }
-              });
+            sidebar.addEventListener("click", (event) => {
+              const link = (event.target as Element).closest('a[href^="#"], .tree-group-grid');
+              if (!link) return;
+              if (window.innerWidth <= 768) {
+                sidebar.classList.remove("open");
+              }
             });
           }
-
         </script>
       </div>
     </div>
 
     <script>
       import { runTestsOnAssets } from './tests/runner.js';
-      
-      const assetsData = JSON.parse(document.getElementById('assets-data').textContent);
-      const tooltip = document.getElementById('test-tooltip');
-      const tooltipData = new Map();
-      
-      document.addEventListener('mouseover', (e) => {
-        const status = e.target.closest('.test-status');
-        if (!status) return;
-      
-        const name = status.getAttribute('data-template-test');
-        const content = tooltipData.get(name);
-        if (!content) return;
-      
-        tooltip.innerHTML = content;
-        tooltip.style.display = 'block';
-      
-        const sidebar = document.getElementById('sidebar');
-        const sidebarRect = sidebar.getBoundingClientRect();
-        const rect = status.getBoundingClientRect();
-        tooltip.style.left = sidebarRect.right + 8 + 'px';
-        tooltip.style.top = rect.top - 6 + 'px';
-      });
-      
-      document.addEventListener('mouseout', (e) => {
-        const status = e.target.closest('.test-status');
-        if (!status) return;
-        tooltip.style.display = 'none';
-      });
-      
-      async function runTests() {
-        const reports = await runTestsOnAssets(assetsData);
-      
-        for (const report of reports) {
-          const statusEl = document.querySelector('[data-template-test="' + report.name + '"]');
-          if (!statusEl) continue;
-      
-          const iconEl = statusEl.querySelector('.test-status-icon');
-          const hasFailed = !report.passed;
-          const hasWarning = report.warningCount > 0;
-      
-          if (hasFailed) {
-            iconEl.textContent = '✗';
-            iconEl.classList.add('failed');
-            const lines = report.results
-              .filter(r => !r.result.passed)
-              .map(r => '✗ ' + r.testName + ': ' + r.result.message);
-            tooltipData.set(report.name, lines.join('<br>'));
-          } else if (hasWarning) {
-            iconEl.textContent = '⚠';
-            iconEl.classList.add('warn');
-            const lines = report.results
-              .filter(r => r.result.isWarning)
-              .map(r => '⚠ ' + r.testName + ': ' + r.result.message);
-            tooltipData.set(report.name, lines.join('<br>'));
-          } else {
-            iconEl.textContent = '✓';
-            iconEl.classList.add('passed');
-            tooltipData.set(report.name, 'All tests passed');
+
+      const assetsElement = document.getElementById('assets-data');
+
+      if (assetsElement) {
+        const assetsData = JSON.parse(assetsElement.textContent);
+        const tooltip = document.getElementById('test-tooltip');
+        const tooltipData = new Map();
+
+        document.addEventListener('mouseover', (e) => {
+          const status = e.target.closest('.test-status');
+          if (!status) return;
+
+          const name = status.getAttribute('data-template-test');
+          const content = tooltipData.get(name);
+          if (!content) return;
+
+          tooltip.innerHTML = content;
+          tooltip.style.display = 'block';
+
+          const sidebar = document.getElementById('sidebar');
+          const sidebarRect = sidebar.getBoundingClientRect();
+          const rect = status.getBoundingClientRect();
+          tooltip.style.left = sidebarRect.right + 8 + 'px';
+          tooltip.style.top = rect.top - 6 + 'px';
+        });
+
+        document.addEventListener('mouseout', (e) => {
+          const status = e.target.closest('.test-status');
+          if (!status) return;
+          tooltip.style.display = 'none';
+        });
+
+        const runTests = async () => {
+          const reports = await runTestsOnAssets(assetsData);
+
+          for (const report of reports) {
+            const statusEl = document.querySelector('[data-template-test="' + report.name + '"]');
+            if (!statusEl) continue;
+
+            const iconEl = statusEl.querySelector('.test-status-icon');
+            const hasFailed = !report.passed;
+            const hasWarning = report.warningCount > 0;
+
+            if (hasFailed) {
+              iconEl.textContent = '✗';
+              iconEl.classList.add('failed');
+              const lines = report.results
+                .filter(r => !r.result.passed)
+                .map(r => '✗ ' + r.testName + ': ' + r.result.message);
+              tooltipData.set(report.name, lines.join('<br>'));
+            } else if (hasWarning) {
+              iconEl.textContent = '⚠';
+              iconEl.classList.add('warn');
+              const lines = report.results
+                .filter(r => r.result.isWarning)
+                .map(r => '⚠ ' + r.testName + ': ' + r.result.message);
+              tooltipData.set(report.name, lines.join('<br>'));
+            } else {
+              iconEl.textContent = '✓';
+              iconEl.classList.add('passed');
+              tooltipData.set(report.name, 'All tests passed');
+            }
           }
-        }
+        };
+
+        runTests();
       }
-      
-      runTests();
     </script>
 
     <style>
       .sidebar {
-        margin: 8px;
-        border-radius: 8px;
-        background: #fff;
-        padding: 1rem 0.75rem;
+        width: 260px;
+        background: var(--sidebar-bg);
+        padding: 12px 10px;
         box-sizing: border-box;
-        border-right: 1px solid #e0e0e0;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-right: 1px solid var(--line);
         max-height: 100vh;
         overflow-y: auto;
+        font-size: 0.8125rem;
+        color: var(--text);
       }
 
-      .sidebar-header {
+      /* Brand */
+
+      .sidebar-brand {
         display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        margin-bottom: 1rem;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 6px 12px;
       }
 
-      .download-button {
-        appearance: none;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+      .brand-badge {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
-        min-height: 2.25rem;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 700;
+        flex: none;
       }
 
-      .download-button:hover:not(:disabled) {
-        background: #0056b3;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+      .brand-logo {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        object-fit: cover;
+        flex: none;
       }
 
-      .download-button:disabled {
-        opacity: 0.8;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-        background: #6c757d;
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        line-height: 1.3;
       }
+
+      .brand-title {
+        font-weight: 650;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .brand-subtitle {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* Quick search */
+
+      .sidebar-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 32px;
+        padding: 0 10px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        background: var(--field-bg);
+        color: var(--text-muted);
+      }
+
+      .sidebar-search:focus-within {
+        background: var(--field-bg-focus);
+        box-shadow: 0 0 0 2px var(--accent-ring);
+      }
+
+      .search-icon {
+        flex: none;
+      }
+
+      .sidebar-search input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        outline: none;
+        background: transparent;
+        font: inherit;
+        font-size: 0.8125rem;
+        color: var(--text);
+      }
+
+      .sidebar-search input::placeholder {
+        color: var(--text-muted);
+      }
+
+      .search-hint {
+        flex: none;
+        font-family: inherit;
+        font-size: 0.6875rem;
+        color: var(--text-faint);
+        letter-spacing: 0.04em;
+      }
+
+      /* Nav rows */
+
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+
+      .nav-row {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 32px;
+        padding: 0 10px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-size: 0.8125rem;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .nav-icon {
+        flex: none;
+        color: var(--text-muted);
+      }
+
+      .nav-row:hover:not(:disabled) {
+        background: var(--row-hover);
+      }
+
+      .nav-row.active,
+      .nav-row.active .nav-icon {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .nav-row.active .nav-icon {
+        background: none;
+      }
+
+      .nav-row.done,
+      .nav-row.done .nav-icon {
+        color: #16a34a;
+      }
+
+      .nav-row:disabled {
+        color: var(--text-faint);
+        cursor: default;
+      }
+
+      .nav-row:disabled .nav-icon {
+        color: var(--text-faint);
+      }
+
+      /* Section heading */
+
+      .sidebar-divider {
+        height: 1px;
+        margin: 12px 10px;
+        background: var(--line);
+      }
+
+      .section-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 10px;
+        margin-bottom: 6px;
+        min-height: 22px;
+      }
+
+      .section-label-text {
+        flex: 1;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-faint);
+      }
+
+      .section-actions {
+        display: flex;
+        gap: 2px;
+      }
+
+      .icon-button {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .icon-button:hover {
+        background: var(--row-hover);
+        color: var(--text);
+      }
+
+      .icon-button[data-mode="tree"],
+      .icon-button[data-mode="modified"] {
+        color: var(--accent);
+      }
+
+      /* Only the icon matching the current mode is shown. */
+      .icon-button .icon-tree,
+      .icon-button .icon-modified {
+        display: none;
+      }
+
+      .icon-button[data-mode="tree"] .icon-flat,
+      .icon-button[data-mode="modified"] .icon-name {
+        display: none;
+      }
+
+      .icon-button[data-mode="tree"] .icon-tree,
+      .icon-button[data-mode="modified"] .icon-modified {
+        display: inline-block;
+      }
+
+      /* Page rows */
 
       a[href] {
         color: inherit;
@@ -605,68 +1351,136 @@ if (testsEnabled) {
         box-sizing: border-box;
         appearance: none;
         width: 100%;
+        align-items: center;
+        gap: 2px;
+        padding: 0 4px 0 10px;
+        border: none;
+        border-radius: 8px;
         background: transparent;
         color: inherit;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0px 4px 0px 6px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
       }
 
       .button a[href^="#"] {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 10px;
         flex: 1;
-        min-height: 2rem;
+        min-width: 0;
+        min-height: 30px;
       }
 
       .template-number {
-        font-size: 0.65rem;
-        opacity: 0.6;
-        min-width: 1rem;
-        text-align: center;
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-faint);
+        min-width: 1.1rem;
       }
 
       .template-name {
         flex: 1;
-        font-size: 0.8rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        margin-right: 0.5rem;
-      }
-
-      .button.active {
-        background: #007bff;
-        color: #fff;
-        border-color: #007bff;
-      }
-
-      .button.active .template-number {
-        opacity: 0.9;
-      }
-
-      .template-link {
-        font-size: 0.65rem;
-        padding: 8px 10px;
-        border-radius: 8px;
-        transition: all 0.2s;
-      }
-
-      .template-link:hover {
-        background: #8282823e;
       }
 
       .button:hover {
-        box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.04);
+        background: var(--row-hover);
       }
 
-      .button:active {
-        transition: none;
-        box-shadow: none;
+      .button.active {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .button.active .template-number {
+        color: var(--accent);
+        opacity: 0.7;
+      }
+
+      .template-link {
+        display: flex;
+        align-items: center;
+        padding: 6px;
+        border-radius: 5px;
+        color: var(--text-faint);
+        opacity: 0;
+      }
+
+      .button:hover .template-link,
+      .button.active .template-link {
+        opacity: 1;
+      }
+
+      .template-link:hover {
+        background: var(--row-hover-strong);
+        color: var(--text);
+      }
+
+      .button.active .template-link {
+        color: var(--accent);
+      }
+
+      .list-empty {
+        margin: 12px 10px;
+        font-size: 0.75rem;
+        color: var(--text-faint);
+      }
+
+      /* Grid preview */
+
+      .preview-grid {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 0;
+      }
+
+      .preview-grid-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 4px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .preview-grid-title {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .preview-grid-count {
+        opacity: 0.7;
+        flex: 1;
+      }
+
+      .preview-grid-close {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: inherit;
+        border-radius: 6px;
+        width: 24px;
+        height: 24px;
+        line-height: 1;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .preview-grid-close:hover {
+        background: #8282823e;
+      }
+
+      .preview-grid-items {
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        align-items: flex-start;
+        gap: 16px;
+        overflow: auto;
+        padding-bottom: 24px;
+        min-height: 0;
       }
 
       .test-status {
@@ -724,33 +1538,6 @@ if (testsEnabled) {
         pointer-events: none;
       }
 
-      @media (prefers-color-scheme: dark) {
-        .sidebar {
-          background-color: hsl(258, 4%, 14%);
-          border-right: 1px solid #000000;
-        }
-
-        .button {
-          border: 1px solid #4b4b4b;
-        }
-
-        .button:hover {
-          background: #3f3f3f;
-        }
-
-        .button.active {
-          background: #0066cc;
-          border-color: #0066cc;
-        }
-
-        .download-button:hover:not(:disabled) {
-          background: #0056b3;
-        }
-
-        .download-button:disabled {
-          background: #6c757d;
-        }
-      }
 
       @media (max-width: 768px) {
         .sidebar {
@@ -769,6 +1556,177 @@ if (testsEnabled) {
         .sidebar.open {
           transform: translateX(0);
           box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+        }
+      }
+    </style>
+    <!--
+      These elements are created at runtime by the preview script, so they never
+      receive Astro's scoped-style attribute. Their rules have to be global.
+    -->
+    <style is:global>
+      /* Directory hierarchy */
+
+      .filtered-out {
+        display: none !important;
+      }
+
+      .tree-group-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding-right: 4px;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .tree-group-header:hover {
+        background: var(--row-hover);
+      }
+
+      .tree-group.active > .tree-group-header {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tree-caret {
+        display: flex;
+        align-items: center;
+        color: var(--text-faint);
+        transform: rotate(90deg);
+        transition: transform 0.15s ease;
+      }
+
+      .tree-group.collapsed > .tree-group-header .tree-caret {
+        transform: rotate(0deg);
+      }
+
+      .tree-badge {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        background: hsl(var(--badge-hue, 24) 62% 86%);
+        color: hsl(var(--badge-hue, 24) 45% 32%);
+      }
+
+      .tree-group-name {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.8125rem;
+        font-weight: 550;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tree-group-count {
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-faint);
+      }
+
+      .tree-group.active > .tree-group-header .tree-group-count {
+        color: inherit;
+        opacity: 0.7;
+      }
+
+      .tree-group-grid {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        padding: 5px;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--text-faint);
+        cursor: pointer;
+        opacity: 0;
+      }
+
+      .tree-group-header:hover .tree-group-grid,
+      .tree-group.active > .tree-group-header .tree-group-grid {
+        opacity: 1;
+      }
+
+      .tree-group.active > .tree-group-header .tree-group-grid {
+        color: inherit;
+      }
+
+      .tree-group-grid:hover {
+        background: var(--row-hover-strong);
+        color: var(--text);
+      }
+
+      .tree-group.collapsed > .tree-group-children {
+        display: none;
+      }
+
+      /* Grid preview cards */
+
+      .grid-card {
+        /* The inline width is the page's own width; the border sits outside it. */
+        box-sizing: content-box;
+        flex: none;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .grid-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        font-size: 0.75rem;
+        color: var(--text);
+        text-decoration: none;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .grid-card-header:hover .grid-card-name {
+        color: var(--accent);
+      }
+
+      .grid-card-name {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .grid-card-size {
+        color: var(--text-faint);
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .grid-card-stage {
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .grid-card-stage iframe {
+        display: block;
+        border: none;
+        max-width: none;
+        max-height: none;
+        pointer-events: none;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .tree-badge {
+          background: hsl(var(--badge-hue, 24) 35% 26%);
+          color: hsl(var(--badge-hue, 24) 70% 78%);
         }
       }
     </style>

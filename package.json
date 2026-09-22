@@ -13,8 +13,8 @@
 	"version": "0.21.3",
 	"main": "index.js",
 	"scripts": {
-		"dev": "astro dev",
-		"build": "astro build"
+		"dev": "npx astro dev",
+		"build": "npx astro build"
 	},
 	"dependencies": {
 		"@astrojs/react": "^4.4.0",
