@@ -111,6 +111,14 @@ async function findTemplates(
 
 const templates = await findTemplates("src/pages", "", 0, 2);
 
+// Fallback images sit next to their page as "src/pages/<name>.jpg".
+const fallbackImages = import.meta.glob<string>("/src/pages/**/*.jpg", {
+	eager: true,
+	query: "?url",
+	import: "default",
+});
+const thumbnailOf = (name: string) => fallbackImages[`/src/pages/${name}.jpg`];
+
 // The sidebar is titled after the project astro-html is installed in.
 function readProjectName() {
 	try {
@@ -422,10 +430,13 @@ if (testsEnabled) {
         {
           templates.map((template, index) => {
             const path = template?.name.replace(".astro", "");
+            const thumbnail = thumbnailOf(path);
             return (
               <div class="button" data-template={path}>
                 <a href={`#${path}`}>
-                  <span class="template-number">{String(index + 1).padStart(2, '0')}</span>
+                  {thumbnail
+                    ? <img class="template-thumb" src={thumbnail} alt="" loading="lazy" />
+                    : <span class="template-number">{String(index + 1).padStart(2, '0')}</span>}
                   <span class="template-name">{path}</span>
                 </a>
                 {testsEnabled && (
@@ -754,8 +765,9 @@ if (testsEnabled) {
             // Renumber over what is actually on screen.
             const visible = list.querySelectorAll<HTMLElement>(".button:not(.filtered-out)");
             visible.forEach((el, index) => {
-              el.querySelector<HTMLElement>(".template-number")!.textContent =
-                String(index + 1).padStart(2, "0");
+              // Rows with a fallback thumbnail show the image instead of a number.
+              const number = el.querySelector<HTMLElement>(".template-number");
+              if (number) number.textContent = String(index + 1).padStart(2, "0");
             });
 
             emptyState.hidden = visible.length > 0;
@@ -1386,6 +1398,13 @@ if (testsEnabled) {
         font-variant-numeric: tabular-nums;
         color: var(--text-faint);
         min-width: 1.1rem;
+      }
+
+      .template-thumb {
+        width: 1.75rem;
+        height: 1.25rem;
+        object-fit: contain;
+        flex-shrink: 0;
       }
 
       .template-name {
